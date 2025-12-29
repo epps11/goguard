@@ -1,0 +1,77 @@
+# Development docker-compose with hot-reload support
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: goguard-postgres-dev
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=goguard
+      - POSTGRES_PASSWORD=goguard_secret
+      - POSTGRES_DB=goguard
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U goguard -d goguard"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - goguard-network-dev
+
+  # GoGuard Backend with hot-reload
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: goguard-backend-dev
+    ports:
+      - "8080:8080"
+    environment:
+      - GOGUARD_HOST=0.0.0.0
+      - GOGUARD_PORT=8080
+      - GOGUARD_MODE=debug
+      - GOGUARD_LOG_LEVEL=debug
+      - GOGUARD_DB_HOST=postgres
+      - GOGUARD_DB_PORT=5432
+      - GOGUARD_DB_USER=goguard
+      - GOGUARD_DB_PASSWORD=goguard_secret
+      - GOGUARD_DB_NAME=goguard
+      - GOGUARD_DB_SSLMODE=disable
+    volumes:
+      - .:/app
+      - /app/dashboard  # Exclude dashboard from backend mount
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - goguard-network-dev
+
+  # GoGuard Dashboard with hot-reload
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile.dev
+    container_name: goguard-dashboard-dev
+    ports:
+      - "3001:3000"  # Use 3001 externally to avoid conflicts
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8080  # Browser-accessible URL
+    volumes:
+      - ./dashboard:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - goguard-network-dev
+
+networks:
+  goguard-network-dev:
+    driver: bridge
+
+volumes:
+  postgres_data_dev:

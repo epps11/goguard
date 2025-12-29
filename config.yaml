@@ -1,0 +1,79 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: 30s
+  write_timeout: 30s
+  mode: "release"  # debug, release, test
+
+# Database configuration (PostgreSQL)
+database:
+  host: "localhost"  # Set via GOGUARD_DB_HOST env var
+  port: 5432         # Set via GOGUARD_DB_PORT env var
+  user: "goguard"    # Set via GOGUARD_DB_USER env var
+  password: ""       # Set via GOGUARD_DB_PASSWORD env var
+  name: "goguard"    # Set via GOGUARD_DB_NAME env var
+  sslmode: "disable" # Set via GOGUARD_DB_SSLMODE env var
+
+# LLM settings are now managed via the dashboard Settings page
+# These values serve as defaults and can be overridden in the database
+llm:
+  provider: "openai"  # openai, anthropic, google, bedrock, ollama, xai
+  api_key: ""         # Set via GOGUARD_LLM_API_KEY env var
+  base_url: ""        # Optional custom base URL
+  model: "gpt-4o"
+  max_tokens: 4096
+  temperature: 0.7
+  # AWS Bedrock specific settings
+  aws_region: ""      # Set via AWS_REGION env var
+  aws_access_key: ""  # Set via AWS_ACCESS_KEY_ID env var
+  aws_secret_key: ""  # Set via AWS_SECRET_ACCESS_KEY env var
+
+# Security settings - can be managed via dashboard
+security:
+  enable_injection_detection: true
+  block_on_detection: true
+  max_prompt_length: 32000
+  rate_limit_per_minute: 100
+  injection_patterns: []  # Additional custom regex patterns
+
+# PII masking settings - can be managed via dashboard
+pii:
+  enable_masking: true
+  mask_character: "*"
+  preserve_domain: false  # For emails, keep domain visible
+  pii_types:
+    - email
+    - phone
+    - ssn
+    - credit_card
+    - ip_address
+    - aws_key
+    - api_key
+
+# OIDC authentication configuration
+oidc:
+  enabled: false           # Set via OIDC_ENABLED env var
+  issuer_url: ""           # Set via OIDC_ISSUER_URL env var
+  client_id: ""            # Set via OIDC_CLIENT_ID env var
+  client_secret: ""        # Set via OIDC_CLIENT_SECRET env var
+  redirect_url: ""         # Set via OIDC_REDIRECT_URL env var
+  scopes:
+    - openid
+    - profile
+    - email
+
+# JWT settings for API authentication
+jwt:
+  secret: ""               # Set via GOGUARD_JWT_SECRET env var (required for production)
+  expiry: 24h
+
+# Logging configuration
+logging:
+  level: "info"  # debug, info, warn, error
+  format: "json"  # json, console
+  output_path: ""  # Empty for stdout
+
+# Notification settings - can be managed via dashboard
+notifications:
+  webhook_url: ""          # Set via GOGUARD_WEBHOOK_URL env var
+  email_recipients: []     # Comma-separated list of emails

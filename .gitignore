@@ -1,0 +1,94 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+goguard
+/bin/
+/dist/
+
+# Test binary
+*.test
+
+# Output of go coverage tool
+*.out
+coverage.html
+coverage.txt
+
+# Go workspace
+go.work
+go.work.sum
+
+# Dependency directories
+vendor/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# Secrets and credentials
+*.pem
+*.key
+*.crt
+*.p12
+secrets/
+credentials/
+
+# Log files
+*.log
+logs/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+docker-compose.override.yml
+
+# Node.js (dashboard)
+dashboard/node_modules/
+dashboard/.next/
+dashboard/out/
+dashboard/.pnpm-store/
+dashboard/.turbo/
+dashboard/coverage/
+
+# Build artifacts
+dashboard/build/
+dashboard/dist/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Cache directories
+.cache/
+__pycache__/
+*.pyc
+
+# Pre-commit cache (local)
+.pre-commit-cache/
+
+# Test artifacts
+test-results/
+playwright-report/
+
+# Misc
+*.bak
+*.backup
