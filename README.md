@@ -42,6 +42,25 @@ GoGuard is a comprehensive AI governance platform providing both a **Data Plane*
 - **Smart Masking**: Preserve partial information (e.g., last 4 digits of phone)
 - **Configurable**: Enable/disable specific PII types
 
+### 💰 Spending Tracking
+
+- **Automatic Cost Tracking**: Automatically calculates and tracks spending based on token usage
+- **Per-User Limits**: Set daily, weekly, or monthly spending limits per user
+- **Multi-Model Pricing**: Built-in pricing for OpenAI, Anthropic, Google, AWS Bedrock, X.AI models
+- **Alert Thresholds**: Get notified when spending reaches configurable thresholds
+- **Real-time Updates**: Spending updates immediately after each LLM request
+
+**Default Pricing (per 1M tokens):**
+
+| Model | Input | Output |
+|-------|-------|--------|
+| gpt-4o | $2.50 | $10.00 |
+| gpt-4o-mini | $0.15 | $0.60 |
+| claude-3-5-sonnet | $3.00 | $15.00 |
+| claude-3-haiku | $0.25 | $1.25 |
+| gemini-1.5-pro | $1.25 | $5.00 |
+| gemini-1.5-flash | $0.075 | $0.30 |
+
 ### 🤖 LLM Integration
 
 - **Multi-Provider Support**: OpenAI, Anthropic, Google Gemini, X.AI, Ollama
@@ -280,6 +299,71 @@ curl -X PUT http://localhost:8080/api/v1/control/settings/llm \
   }'
 ```
 
+### Example 9: Spending Tracking
+
+Create a spending limit and track usage automatically:
+
+```bash
+# 1. Create a monthly spending limit for a user
+curl -X POST http://localhost:8080/api/v1/control/spending-limits \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user-123",
+    "limit_type": "monthly",
+    "limit_amount": 100.00,
+    "currency": "USD",
+    "alert_at": 80
+  }'
+```
+
+**Response:**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "user_id": "user-123",
+  "limit_type": "monthly",
+  "limit_amount": 100,
+  "current_spend": 0,
+  "currency": "USD",
+  "alert_at": 80
+}
+```
+
+```bash
+# 2. Make requests with user_id - spending is tracked automatically
+curl -X POST http://localhost:8080/api/v1/guard \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user-123",
+    "messages": [
+      {"role": "user", "content": "Explain machine learning"}
+    ]
+  }'
+```
+
+```bash
+# 3. Check spending - it accumulates with each request
+curl http://localhost:8080/api/v1/control/spending-limits
+```
+
+**Response:**
+```json
+{
+  "spending_limits": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "user_id": "user-123",
+      "limit_type": "monthly",
+      "limit_amount": 100,
+      "current_spend": 0.00125,
+      "currency": "USD",
+      "alert_at": 80
+    }
+  ],
+  "total": 1
+}
+```
+
 ## API Endpoints
 
 ### Health Check
@@ -488,7 +572,8 @@ goguard/
 │       ├── llm/          # LLM client
 │       ├── pii/          # PII masking
 │       ├── policy/       # Policy engine
-│       └── settings/     # Settings service
+│       ├── settings/     # Settings service
+│       └── spending/     # Spending tracker
 ├── dashboard/            # Next.js frontend
 │   ├── src/
 │   │   ├── app/          # Next.js pages
