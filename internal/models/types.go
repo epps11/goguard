@@ -5,6 +5,7 @@ import "time"
 // GuardRequest represents an incoming request to be processed
 type GuardRequest struct {
 	RequestID   string            `json:"request_id"`
+	UserID      string            `json:"user_id,omitempty"` // Optional user ID for spending tracking
 	Messages    []Message         `json:"messages"`
 	Provider    string            `json:"provider,omitempty"` // openai, anthropic, google, bedrock, ollama, xai
 	Model       string            `json:"model,omitempty"`

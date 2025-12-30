@@ -32,6 +32,11 @@ export default function SettingsPage() {
   const [piiMasking, setPiiMasking] = useState(true)
   const [rateLimit, setRateLimit] = useState(100)
 
+  // Storage settings
+  const [storageType, setStorageType] = useState("In-Memory")
+  const [auditLogRetention, setAuditLogRetention] = useState(10000)
+  const [databaseConnected, setDatabaseConnected] = useState(false)
+
   useEffect(() => {
     async function loadSettings() {
       try {
@@ -58,6 +63,20 @@ export default function SettingsPage() {
           setPiiMasking(secSettings.pii_masking_enabled)
         if (secSettings.rate_limit_per_minute)
           setRateLimit(secSettings.rate_limit_per_minute)
+
+        // Load storage info
+        const storageInfo = await fetchAPI<{
+          storage_type: string
+          audit_log_retention: number
+          database_connected: boolean
+        }>("/api/v1/control/settings/storage")
+        if (storageInfo.storage_type) {
+          setStorageType(storageInfo.storage_type === "postgresql" ? "PostgreSQL" : "In-Memory")
+        }
+        if (storageInfo.audit_log_retention) {
+          setAuditLogRetention(storageInfo.audit_log_retention)
+        }
+        setDatabaseConnected(storageInfo.database_connected)
       } catch (error) {
         console.error("Failed to load settings:", error)
       } finally {
@@ -362,15 +381,19 @@ export default function SettingsPage() {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">Storage Type:</span>
-                <span className="ml-2 font-medium">In-Memory</span>
+                <span className={`ml-2 font-medium ${databaseConnected ? "text-green-500" : "text-yellow-500"}`}>
+                  {storageType}
+                </span>
               </div>
               <div>
                 <span className="text-muted-foreground">Audit Log Retention:</span>
-                <span className="ml-2 font-medium">10,000 entries</span>
+                <span className="ml-2 font-medium">{auditLogRetention.toLocaleString()} entries</span>
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-4">
-              Note: Data is stored in-memory and will be lost on restart. Configure a database for persistent storage.
+              {databaseConnected
+                ? "Database connected. Settings and audit logs are persisted."
+                : "Note: Data is stored in-memory and will be lost on restart. Configure a database for persistent storage."}
             </p>
           </CardContent>
         </Card>

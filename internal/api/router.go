@@ -11,6 +11,7 @@ import (
 	"github.com/epps11/goguard/internal/services/pii"
 	"github.com/epps11/goguard/internal/services/policy"
 	"github.com/epps11/goguard/internal/services/settings"
+	"github.com/epps11/goguard/internal/services/spending"
 )
 
 // Router manages the API routes
@@ -47,10 +48,12 @@ func NewRouter(cfg *config.Config, llmClient *llm.Client, repo ...*database.Repo
 	policyEngine := policy.NewEngine()
 	auditLogger := audit.NewLogger(10000)
 
-	// Initialize settings service with database if provided
+	// Initialize settings service and spending tracker with database if provided
 	var settingsSvc *settings.Service
+	var spendingTracker *spending.Tracker
 	if len(repo) > 0 && repo[0] != nil {
 		settingsSvc = settings.NewService(repo[0])
+		spendingTracker = spending.NewTracker(repo[0])
 	}
 
 	// Create LLM client factory for per-request provider support
@@ -64,9 +67,15 @@ func NewRouter(cfg *config.Config, llmClient *llm.Client, repo ...*database.Repo
 		if settingsSvc != nil {
 			llmFactory.SetSettingsProvider(settingsSvc)
 		}
-		handler = NewHandlerWithFactory(detector, masker, llmFactory, auditLogger)
+		handler = NewHandlerWithFactory(detector, masker, llmFactory, auditLogger, spendingTracker)
 	}
-	controlHandler := NewControlHandler(policyEngine, auditLogger, settingsSvc)
+
+	// Get repository for control handler (may be nil if no database)
+	var dbRepo *database.Repository
+	if len(repo) > 0 && repo[0] != nil {
+		dbRepo = repo[0]
+	}
+	controlHandler := NewControlHandler(policyEngine, auditLogger, settingsSvc, dbRepo)
 
 	// Create engine
 	engine := gin.New()
@@ -172,6 +181,7 @@ func (r *Router) setupRoutes() {
 			settingsGroup.PUT("/llm", r.controlHandler.UpdateLLMSettings)
 			settingsGroup.GET("/security", r.controlHandler.GetSecuritySettings)
 			settingsGroup.PUT("/security", r.controlHandler.UpdateSecuritySettings)
+			settingsGroup.GET("/storage", r.controlHandler.GetStorageInfo)
 		}
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/epps11/goguard/internal/models"
@@ -213,6 +214,20 @@ func (r *Repository) CreateSpendingLimit(ctx context.Context, limit *models.Spen
 	return err
 }
 
+func (r *Repository) GetSpendingLimit(ctx context.Context, id string) (*models.SpendingLimit, error) {
+	var limit models.SpendingLimit
+	err := r.db.QueryRowContext(ctx, `
+		SELECT id, user_id, limit_type, limit_amount, current_spend, currency, reset_at, alert_at, created_at, updated_at
+		FROM spending_limits WHERE id = $1
+	`, id).Scan(&limit.ID, &limit.UserID, &limit.LimitType, &limit.LimitAmount,
+		&limit.CurrentSpend, &limit.Currency, &limit.ResetAt, &limit.AlertAt,
+		&limit.CreatedAt, &limit.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &limit, nil
+}
+
 func (r *Repository) ListSpendingLimits(ctx context.Context) ([]*models.SpendingLimit, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, user_id, limit_type, limit_amount, current_spend, currency, reset_at, alert_at, created_at, updated_at
@@ -238,13 +253,20 @@ func (r *Repository) ListSpendingLimits(ctx context.Context) ([]*models.Spending
 
 func (r *Repository) UpdateSpendingLimit(ctx context.Context, limit *models.SpendingLimit) error {
 	limit.UpdatedAt = time.Now()
-	_, err := r.db.ExecContext(ctx, `
+	result, err := r.db.ExecContext(ctx, `
 		UPDATE spending_limits SET user_id = $2, limit_type = $3, limit_amount = $4,
 		current_spend = $5, currency = $6, reset_at = $7, alert_at = $8, updated_at = $9
 		WHERE id = $1
 	`, limit.ID, limit.UserID, limit.LimitType, limit.LimitAmount, limit.CurrentSpend,
 		limit.Currency, limit.ResetAt, limit.AlertAt, limit.UpdatedAt)
-	return err
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("no spending limit found with id: %s", limit.ID)
+	}
+	return nil
 }
 
 // AuditLog operations

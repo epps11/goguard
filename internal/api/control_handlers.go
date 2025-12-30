@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/epps11/goguard/internal/database"
 	"github.com/epps11/goguard/internal/models"
 	"github.com/epps11/goguard/internal/services/audit"
 	"github.com/epps11/goguard/internal/services/policy"
@@ -16,14 +17,16 @@ type ControlHandler struct {
 	policyEngine    *policy.Engine
 	auditLogger     *audit.Logger
 	settingsService *settings.Service
+	repo            *database.Repository
 }
 
 // NewControlHandler creates a new control handler
-func NewControlHandler(engine *policy.Engine, logger *audit.Logger, settingsSvc *settings.Service) *ControlHandler {
+func NewControlHandler(engine *policy.Engine, logger *audit.Logger, settingsSvc *settings.Service, repo *database.Repository) *ControlHandler {
 	return &ControlHandler{
 		policyEngine:    engine,
 		auditLogger:     logger,
 		settingsService: settingsSvc,
+		repo:            repo,
 	}
 }
 
@@ -115,6 +118,16 @@ func (h *ControlHandler) CreateSpendingLimit(c *gin.Context) {
 		return
 	}
 
+	// Use database if available, otherwise fall back to in-memory
+	if h.repo != nil {
+		if err := h.repo.CreateSpendingLimit(c.Request.Context(), &limit); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, limit)
+		return
+	}
+
 	created, err := h.policyEngine.CreateSpendingLimit(c.Request.Context(), &limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -128,6 +141,17 @@ func (h *ControlHandler) CreateSpendingLimit(c *gin.Context) {
 func (h *ControlHandler) GetSpendingLimit(c *gin.Context) {
 	id := c.Param("id")
 
+	// Use database if available
+	if h.repo != nil {
+		limit, err := h.repo.GetSpendingLimit(c.Request.Context(), id)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, limit)
+		return
+	}
+
 	limit, err := h.policyEngine.GetSpendingLimit(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -139,6 +163,20 @@ func (h *ControlHandler) GetSpendingLimit(c *gin.Context) {
 
 // ListSpendingLimits lists all spending limits
 func (h *ControlHandler) ListSpendingLimits(c *gin.Context) {
+	// Use database if available
+	if h.repo != nil {
+		limits, err := h.repo.ListSpendingLimits(c.Request.Context())
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"spending_limits": limits,
+			"total":           len(limits),
+		})
+		return
+	}
+
 	limits, err := h.policyEngine.ListSpendingLimits(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -453,4 +491,18 @@ func (h *ControlHandler) UpdateSecuritySettings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "security settings updated"})
+}
+
+// GetStorageInfo returns information about the storage backend
+func (h *ControlHandler) GetStorageInfo(c *gin.Context) {
+	storageType := "in-memory"
+	if h.settingsService != nil {
+		storageType = "postgresql"
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"storage_type":        storageType,
+		"audit_log_retention": 10000,
+		"database_connected":  h.settingsService != nil,
+	})
 }

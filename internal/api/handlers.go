@@ -12,6 +12,7 @@ import (
 	"github.com/epps11/goguard/internal/services/injection"
 	"github.com/epps11/goguard/internal/services/llm"
 	"github.com/epps11/goguard/internal/services/pii"
+	"github.com/epps11/goguard/internal/services/spending"
 )
 
 // Handler contains all HTTP handlers
@@ -21,6 +22,7 @@ type Handler struct {
 	llmClient         *llm.Client
 	llmFactory        *llm.ClientFactory
 	auditLogger       *audit.Logger
+	spendingTracker   *spending.Tracker
 	startTime         time.Time
 	version           string
 }
@@ -38,13 +40,14 @@ func NewHandler(detector *injection.Detector, masker *pii.Masker, client *llm.Cl
 }
 
 // NewHandlerWithFactory creates a new handler with LLM client factory for per-request provider support
-func NewHandlerWithFactory(detector *injection.Detector, masker *pii.Masker, factory *llm.ClientFactory, logger *audit.Logger) *Handler {
+func NewHandlerWithFactory(detector *injection.Detector, masker *pii.Masker, factory *llm.ClientFactory, logger *audit.Logger, tracker *spending.Tracker) *Handler {
 	return &Handler{
 		injectionDetector: detector,
 		piiMasker:         masker,
 		llmClient:         factory.GetDefaultClient(),
 		llmFactory:        factory,
 		auditLogger:       logger,
+		spendingTracker:   tracker,
 		startTime:         time.Now(),
 		version:           "1.0.0",
 	}
@@ -95,6 +98,7 @@ func (h *Handler) Guard(c *gin.Context) {
 
 	// Step 3: Forward to LLM (if client is configured)
 	// Use factory if available for per-request provider support
+	var modelUsed string
 	if h.llmFactory != nil {
 		client, shouldClose, err := h.llmFactory.GetClient(&req)
 		if err != nil {
@@ -108,6 +112,7 @@ func (h *Handler) Guard(c *gin.Context) {
 				response.Error = err.Error()
 			} else {
 				response.LLMResponse = llmResp
+				modelUsed = llmResp.Model
 			}
 		}
 	} else if h.llmClient != nil && h.llmClient.IsInitialized() {
@@ -116,6 +121,19 @@ func (h *Handler) Guard(c *gin.Context) {
 			response.Error = err.Error()
 		} else {
 			response.LLMResponse = llmResp
+			modelUsed = llmResp.Model
+		}
+	}
+
+	// Step 4: Track spending if we have usage data
+	if h.spendingTracker != nil && response.LLMResponse != nil && response.LLMResponse.Usage != nil {
+		userID := req.UserID
+		if userID == "" {
+			userID = "default" // Use default user if not specified
+		}
+		if err := h.spendingTracker.RecordUsage(c.Request.Context(), userID, modelUsed, response.LLMResponse.Usage); err != nil {
+			// Log error but don't fail the request
+			c.Error(err)
 		}
 	}
 
